@@ -4,6 +4,11 @@ apply plugin: 'kotlin-android-extensions'
 apply plugin: 'kotlin-kapt'
 apply plugin: 'realm-android'
 
+def keystorePropertiesFile = rootProject.file("keystores.properties")
+def keystoreProperties = new Properties()
+keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+//https://medium.com/@cassioso/a-strategy-to-secure-your-api-keys-using-gradle-b9c107272860
+//http://www.rainbowbreeze.it/environmental-variables-api-key-and-secret-buildconfig-and-android-studio/
 android {
     compileSdkVersion 26
     defaultConfig {
@@ -28,7 +33,7 @@ android {
     }
 
     buildTypes.each {
-        it.buildConfigField('String','NEWS_READER_API_KEY',NEWS_READER_API_KEY)
+        it.buildConfigField('String','NEWS_READER_API_KEY',keystoreProperties['NEWS_READER_API_KEY'])
     }
 
     packagingOptions {

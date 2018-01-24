@@ -1,9 +1,8 @@
-// Top-level build file where you can add configuration options common to all sub-projects/modules.
+// Top-level build file where you can add configuration options co
 
 buildscript {
     ext.kotlin_version = '1.2.20'
     ext.support_lib_version = '25.3.1'
-    ext.NEWS_READER_API_KEY = 'f7087fda2571493d86201b6d197849f2'
     repositories {
         google()
         jcenter()
