@@ -9,10 +9,13 @@ import java.util.*
 /**
  * Created by jlcs on 1/24/18.
  */
-class DateToLongDeserializer : JsonDeserializer<Long>(){
-    override fun deserialize(jsonParser: JsonParser?, ctxt: DeserializationContext?): Long {
-        val format = SimpleDateFormat("yyy-MM-dd'T'HH:mm:ss")
-        val date = jsonParser?.text ?:  return Date().time
+class DateToLongDeserializer : JsonDeserializer<Long>() {
+
+    override fun deserialize(jsonParser: JsonParser,
+                             context: DeserializationContext): Long {
+
+        val format = SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss")
+        val date = jsonParser.text ?: return Date().time
         return format.parse(date).time
     }
 
