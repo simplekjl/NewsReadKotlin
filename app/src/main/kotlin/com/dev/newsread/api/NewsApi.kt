@@ -12,14 +12,20 @@ import retrofit2.http.Query
  * Created by jlcs on 1/24/18.
  */
 
-interface NewsApi{
+interface NewsApi {
 
-    @GET("articles")
-    fun getArticles(@Query("source")source : String,
-                    @Query("apiKey")apiKey : String = BuildConfig.NEWS_READER_API_KEY): Call<ArticleResponse>
+    @GET("top-headlines")
+    fun getArticles(@Query("sources") source: String,
+                    @Query("apiKey") apiKey: String = BuildConfig.NEWS_READER_API_KEY,
+                    @Query("language") lang: String = "en"): Call<ArticleResponse>
+
     @GET("sources")
     fun getSources(@Query("category") category: String,
                    @Query("apiKey") apiKey: String = BuildConfig.NEWS_READER_API_KEY,
-                   @Query("language") lang : String = "en") : Call<SourceResponse>
+                   @Query("language") lang: String = "en"): Call<SourceResponse>
 
+    @GET("top-headlines")
+    fun search(@Query("q") query: String,
+               @Query("apiKey") apiKey: String = BuildConfig.NEWS_READER_API_KEY,
+               @Query("language") lang: String = "en") : Call<ArticleResponse>
 }
