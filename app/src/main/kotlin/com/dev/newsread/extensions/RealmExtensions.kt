@@ -1,29 +1,19 @@
 package com.dev.newsread.extensions
 
 import io.realm.Realm
-import io.realm.RealmModel
-import io.realm.RealmResults
-import kotlin.coroutines.experimental.suspendCoroutine
+import rx.Emitter
+import rx.Observable
 
 
-suspend fun <T> RealmResults<T>.loadAsync(): List<T> where T : RealmModel {
-	return suspendCoroutine { continuation ->
-		this.addChangeListener { items, _ ->
-			this.removeAllChangeListeners()
-			continuation.resume(items)
-		}
-	}
-}
-
-inline suspend fun Realm.inTransactionAsync(crossinline receiver: Realm.() -> Unit) {
-	return suspendCoroutine { continuation ->
-		this.executeTransactionAsync({ realm ->
-			receiver(realm)
-		}, {
-			this.refresh()
-			continuation.resume(Unit)
-		}, { fail ->
-			continuation.resumeWithException(fail)
-		})
-	}
+fun Realm.transactionAsObservable(init: Realm.() -> Unit): Observable<Unit> {
+    return Observable.create({ emitter ->
+        this.executeTransactionAsync({ r ->
+            r.init()
+        }, {
+            emitter.onNext(Unit)
+            emitter.onCompleted()
+        }, { fail ->
+            emitter.onError(fail)
+        })
+    }, Emitter.BackpressureMode.DROP)
 }
