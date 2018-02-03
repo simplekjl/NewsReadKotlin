@@ -1,57 +1,52 @@
 package com.dev.newsread.sync
 
+import com.dev.newsread.BuildConfig
 import com.dev.newsread.api.NewsApi
 import com.dev.newsread.data.Article
 import com.dev.newsread.data.Source
-import com.dev.newsread.extensions.executeAsync
-import com.dev.newsread.extensions.launchAsync
-import com.dev.newsread.extensions.waitAllAsync
 import com.dev.newsread.storage.Repository
-import kotlinx.coroutines.experimental.async
+import com.dev.newsread.util.SchedulerProvider
+import rx.Observable
 import java.util.*
-import javax.inject.Provider
 
 
 /**
  * Created by jlcs on 1/25/18.
  */
 class SyncUseCaseImpl(private val newsApi: NewsApi,
-                      private val sourcesRepository: Provider<Repository<Source>>,
-                      private val articlesRepository: Provider<Repository<Article>>) : SyncUseCase {
-    override suspend fun downloadSourcesAsync(categories: Collection<String>) {
-        sourcesRepository.get().use { repo ->
-            val downloadJobs = categories.map { cat -> newsApi.getSources(cat).launchAsync() }
-            val sources = downloadJobs.waitAllAsync().flatMap { job -> job.sources }
-            repo.deleteAll()
-            repo.addAll(sources)
-        }
+                      private val sourcesRepository: Repository<Source>,
+                      private val articlesRepository: Repository<Article>,
+                      private val schedulerProvider : SchedulerProvider) : SyncUseCase {
+
+
+    override fun downloadSources(categories: Collection<String>) : Observable<Unit> {
+        return sourcesRepository.deleteAll()
+                .flatMap { Observable.from(categories) }
+                .observeOn(schedulerProvider.io)
+                .flatMap { c -> newsApi.getSources(c) }
+                .observeOn(schedulerProvider.ui)
+                .flatMap { s -> sourcesRepository.addAll(s.sources) }
     }
 
-    override suspend fun downloadArticlesAsync(source: Source): Int {
-        val response = newsApi.getArticles(source.id).executeAsync()
-        response.articles.forEach { it.category = source.category }
-        var downloadCount = 0
-        async {
-            val repository = articlesRepository.get()
-            repository.use { repo ->
-                for (article in response.articles) {
-                    if (repo.getById(article.url) == null) {
-                        if (article.publishedAt == null || article.publishedAt!! == 0L) {
-                            article.publishedAt = Date().time
-                        }
-                        repo.add(article)
-                        downloadCount++
-                    }
-                }
-            }
-        }.await()
-        return downloadCount
+    override  fun downloadArticles(source: Source):Observable<Int> {
+      return Observable.just(source.id)
+              .observeOn(schedulerProvider.io)
+              .flatMap { id -> newsApi.getArticles(id) }
+              .observeOn(schedulerProvider.ui)
+              .doOnNext{r -> r.articles.forEach{ article -> article.category = source.category}}
+              .flatMap { r -> Observable.from(r.articles) }
+              .filter{ article -> articlesRepository.getById(article.url) == null}
+              .collect({ArrayList<Article>()},{r,a -> r.add(a)})
+              .flatMap { Observable.zip(Observable.just(it), articlesRepository.addAll(it), {p1,p2 ->Pair(p1,p2)}) }
+              .map { (first) -> first.count() }
     }
 
-    suspend override fun search(query: String): List<Article> {
-        return newsApi.search(query)
-                .executeAsync()
-                .articles
-                .distinctBy { article -> article.title }
+    override fun search(query: String): Observable<Unit> {
+
+        return Observable.just(query)
+                .observeOn(schedulerProvider.io)
+                .flatMap { result -> newsApi.search(query,BuildConfig.NEWS_READER_API_KEY,"en") }
+                .observeOn(schedulerProvider.ui)
+                .flatMap { s -> articlesRepository.addAll(s.articles) }
     }
 }
