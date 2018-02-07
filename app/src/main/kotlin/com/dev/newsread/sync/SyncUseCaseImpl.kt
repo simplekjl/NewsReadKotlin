@@ -17,15 +17,20 @@ class SyncUseCaseImpl(private val newsApi: NewsApi,
                       private val sourcesRepository: Repository<Source>,
                       private val articlesRepository: Repository<Article>,
                       private val schedulerProvider : SchedulerProvider) : SyncUseCase {
+    override fun close() {
+        sourcesRepository.close()
+        articlesRepository.close()
+    }
 
 
     override fun downloadSources(categories: Collection<String>) : Observable<Unit> {
-        return sourcesRepository.deleteAll()
-                .flatMap { Observable.from(categories) }
-                .observeOn(schedulerProvider.io)
-                .flatMap { c -> newsApi.getSources(c) }
-                .observeOn(schedulerProvider.ui)
-                .flatMap { s -> sourcesRepository.addAll(s.sources) }
+       return sourcesRepository.deleteAll()
+               .flatMap { Observable.from(categories) }
+               .observeOn(schedulerProvider.io)
+               .flatMap {  c -> newsApi.getSources(c) }
+               .observeOn(schedulerProvider.ui)
+               .flatMap { s -> sourcesRepository.addAll(s.sources) }
+
     }
 
     override  fun downloadArticles(source: Source):Observable<Int> {
@@ -41,12 +46,14 @@ class SyncUseCaseImpl(private val newsApi: NewsApi,
               .map { (first) -> first.count() }
     }
 
-    override fun search(query: String): Observable<Unit> {
+    override fun search(query: String): Observable<List<Article>> {
 
-        return Observable.just(query)
-                .observeOn(schedulerProvider.io)
-                .flatMap { result -> newsApi.search(query,BuildConfig.NEWS_READER_API_KEY,"en") }
-                .observeOn(schedulerProvider.ui)
-                .flatMap { s -> articlesRepository.addAll(s.articles) }
+        return newsApi.search(query,BuildConfig.NEWS_READER_API_KEY,"en")
+                .map { l -> l.articles  }
+//        return Observable.just(newsApi.search(query,BuildConfig.NEWS_READER_API_KEY,"en"))
+//                .observeOn(schedulerProvider.io)
+//                .flatMap { result -> newsApi.search(query,BuildConfig.NEWS_READER_API_KEY,"en") }
+//                .subscribeOn(schedulerProvider.ui)
+//                .flatMap { s -> articlesRepository.addAll(s.articles) }
     }
 }

@@ -60,4 +60,5 @@
     <string name="search_label">Search</string>
     <string name="search_hint">Search headlines</string>
     <string name="network_error_msg">An error occurred while connecting to server, please try again</string>
+    <string name="network_error">Internet Connection failed</string>
 </resources>

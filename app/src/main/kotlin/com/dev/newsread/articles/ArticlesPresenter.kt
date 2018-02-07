@@ -2,11 +2,13 @@ package com.dev.newsread.articles
 
 import android.content.SharedPreferences
 import com.dev.newsread.Presenter
-import com.dev.newsread.data.Article
 import com.dev.newsread.sync.SyncUseCase
 import com.dev.newsread.util.CATEGORIES_TO_RES_MAP
 import com.dev.newsread.util.KEY_CATEGORIES
 import com.dev.newsread.util.KEY_DELETE_DAYS
+import com.dev.newsread.util.SchedulerProvider
+import rx.Observable
+import rx.subscriptions.CompositeSubscription
 import java.io.Closeable
 import javax.inject.Inject
 
@@ -15,58 +17,81 @@ import javax.inject.Inject
  */
 class ArticlesPresenter @Inject constructor(private val articlesUseCase: ArticlesUseCase,
                                             private val sharedPreferences: SharedPreferences,
-                                            private val syncUseCase: SyncUseCase) : Presenter<ArticlesView>, Closeable {
+                                            private val syncUseCase: SyncUseCase,
+                                            private val schedulerProvider: SchedulerProvider)
+    : Presenter<ArticlesView>, Closeable {
+
     private lateinit var view: ArticlesView
+
+    private val subscriptions = CompositeSubscription()
 
     override fun bind(view: ArticlesView) {
         this.view = view
     }
 
-    suspend fun onStart() {
+    fun onStart() {
         view.onUnreadCountChanged(getUnreadCount())
-        val deleteDays = sharedPreferences.getInt(KEY_DELETE_DAYS, 3) // 3 days is default value
-        articlesUseCase.deleteOldArticlesAsync(deleteDays)
-        if (!articlesUseCase.hasArticles()) {
-            view.onNoArticlesAvailable()
-        }
+        val deleteDays = sharedPreferences.getInt(KEY_DELETE_DAYS, 3)
+        subscriptions.add(articlesUseCase.deleteOldArticles(deleteDays)
+                .observeOn(schedulerProvider.ui)
+                .subscribe {
+                    if (!articlesUseCase.hasArticles()) {
+                        view.onNoArticlesAvailable()
+                    }
+                }
+        )
     }
 
-    suspend fun onSelectedCategoriesChangedAsync() {
+    fun onSelectedCategoriesChanged() {
         val selectedCategories = sharedPreferences.getStringSet(KEY_CATEGORIES, setOf())
         val deletedCategories = CATEGORIES_TO_RES_MAP.keys.subtract(selectedCategories)
-        articlesUseCase.onCategoriesChangedAsync(deletedCategories)
+        subscriptions.add(articlesUseCase.onSelectedCategoriesChanged(deletedCategories)
+                .observeOn(schedulerProvider.ui)
+                .subscribe { view.onCategoriesUpdated() })
     }
 
-    suspend fun syncCategoryAsync(category: String?) {
-        val categories = sharedPreferences.getStringSet(KEY_CATEGORIES, setOf())
-        val sources = articlesUseCase.getSourcesAsync(category, categories)
-        var downloadCount = 0
-        for (src in sources.toList()) {
-            downloadCount += syncUseCase.downloadArticlesAsync(src)
-        }
+    fun syncCategory(category: String?) {
+        val selectedCategories = sharedPreferences.getStringSet(KEY_CATEGORIES, setOf())
+        subscriptions.add(articlesUseCase.getSources(category, selectedCategories)
+                .flatMap { sources -> Observable.from(sources) }
+                .flatMap { s -> syncUseCase.downloadArticles(s) }
+                .toList()
+                .map { l -> l.sum() }
+                .observeOn(schedulerProvider.ui)
+                .subscribe({ s ->
+                    view.onUnreadCountChanged(getUnreadCount())
+                    view.onArticlesDownloaded(s)
+                }, { fail ->
+                    view.onSyncFailed(fail)
+                }))
+    }
+
+    fun markArticlesRead(vararg articleUrl: String) {
+        articlesUseCase.markArticlesRead(*articleUrl)
         view.onUnreadCountChanged(getUnreadCount())
-        view.onArticlesDownloaded(downloadCount)
     }
 
-    suspend fun markArticlesRead(vararg articleUrls: String) {
-        articlesUseCase.markArticleReadReadAsync(*articleUrls)
+    fun markArticlesUnread(vararg articleUrl: String) {
+        articlesUseCase.markArticlesUnread(*articleUrl)
         view.onUnreadCountChanged(getUnreadCount())
     }
 
-    suspend fun markArticlesUnread(vararg articleUrl: String) {
-        articlesUseCase.markArticlesUnreadAsync(*articleUrl)
-        view.onUnreadCountChanged(getUnreadCount())
+    fun getArticlesInCategory(category: String?) {
+        subscriptions.add(articlesUseCase.getArticles(category)
+                .observeOn(schedulerProvider.ui)
+                .subscribe { articles ->
+                    view.onArticlesUpdated(articles)
+                })
     }
 
-    suspend fun getArticlesInCategoryAsync(category: String?): List<Article> =
-            articlesUseCase.getArticlesAsync(category)
-
-    private fun getUnreadCount(): Map<String, Long>  {
+    private fun getUnreadCount(): Map<String, Long> {
         val categories = sharedPreferences.getStringSet(KEY_CATEGORIES, setOf())
         return articlesUseCase.getUnreadCount(categories)
     }
 
     override fun close() {
         articlesUseCase.close()
+        subscriptions.clear()
+        syncUseCase.close()
     }
 }

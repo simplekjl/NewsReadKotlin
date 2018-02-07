@@ -8,6 +8,7 @@ import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.DividerItemDecoration
 import android.support.v7.widget.LinearLayoutManager
 import android.support.v7.widget.RecyclerView
+import android.util.Log
 import android.view.MenuItem
 import android.view.View
 import com.dev.newsread.R
@@ -17,15 +18,12 @@ import com.dev.newsread.injection.Injector
 import com.squareup.picasso.Picasso
 import kotlinx.android.synthetic.main.activity_search.*
 import kotlinx.android.synthetic.main.content_main.*
-import kotlinx.coroutines.experimental.Job
-import kotlinx.coroutines.experimental.android.UI
-import kotlinx.coroutines.experimental.launch
 import javax.inject.Inject
 
 
 
 class SearchActivity : AppCompatActivity(), SearchView {
-	private val job = Job()
+
 
 	@Inject
 	lateinit var presenter: SearchPresenter
@@ -47,10 +45,9 @@ class SearchActivity : AppCompatActivity(), SearchView {
 		if (Intent.ACTION_SEARCH == intent.action) {
 			val query = intent.getStringExtra(SearchManager.QUERY)
 			supportActionBar?.title = query.capitalize()
-			launch(UI + job) {
 				progressBar.visibility = View.VISIBLE
 				presenter.search(query)
-			}
+
 		} else {
 			throw IllegalStateException("this activity should be called from search view")
 		}
@@ -79,12 +76,14 @@ class SearchActivity : AppCompatActivity(), SearchView {
 		progressBar.visibility = View.GONE
 	}
 
+
 	override fun onNoSearchResults() {
 		progressBar.visibility = View.GONE
 		noSearchResultsText.visibility = View.VISIBLE
 	}
 
-	override fun onSearchFailed() {
+	override fun onSearchFailed(throwable: Throwable)  {
+		Log.d("SearchActv",throwable.message)
 		progressBar.visibility = View.GONE
 		Snackbar.make(articlesParent, getString(R.string.network_error_msg), Snackbar.LENGTH_LONG).show()
 	}
@@ -99,6 +98,5 @@ class SearchActivity : AppCompatActivity(), SearchView {
 
 	override fun onDestroy() {
 		super.onDestroy()
-		job.cancel()
 	}
 }

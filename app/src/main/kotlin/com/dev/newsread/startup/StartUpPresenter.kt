@@ -7,16 +7,18 @@ import com.dev.newsread.data.Source
 import com.dev.newsread.storage.Repository
 import com.dev.newsread.sync.SyncUseCase
 import com.dev.newsread.util.CATEGORIES_TO_RES_MAP
-import com.dev.newsread.util.KEY_CATEGORIES
+import com.dev.newsread.util.SchedulerProvider
+import rx.Observable
 import javax.inject.Inject
 
 /**
  * Presenter class for the Startup interface
  * Created by jlcs on 1/25/18.
  */
-class StartupPresenter @Inject constructor(private val syncUseCase: SyncUseCase,
-                                           private val sharedPreferences: SharedPreferences,
-                                           private val sourcesRepository: Repository<Source>) : BaseCategoriesPresenter(sharedPreferences), Presenter<StartupView> {
+class StartupPresenter@Inject constructor(private val syncUseCase: SyncUseCase,
+                                          private val sharedPreferences: SharedPreferences,
+                                          private val sourcesRepository: Repository<Source>,
+                                          private val schedulerProvider: SchedulerProvider) : BaseCategoriesPresenter(sharedPreferences), Presenter<StartupView> {
 
     protected override lateinit var view: StartupView
 
@@ -24,15 +26,20 @@ class StartupPresenter @Inject constructor(private val syncUseCase: SyncUseCase,
         this.view = view
     }
 
-    suspend fun downloadSourcesAsync() {
-        val categorySet = sharedPreferences.getStringSet(KEY_CATEGORIES, setOf())
-        if (categorySet.isEmpty()) {
-            view.showNoCategorySelected()
-        } else {
-            syncUseCase.downloadSourcesAsync(CATEGORIES_TO_RES_MAP.keys)
+    fun downloadSources() : Observable<Unit> {
+        if(sourcesRepository.count() == 0L){
+            return  syncUseCase.downloadSources(CATEGORIES_TO_RES_MAP.keys)
         }
+       return Observable.just(Unit)
+
     }
 
     val canOpenMainView: Boolean
         get() = sourcesRepository.count() > 0
+
+    fun close() {
+        syncUseCase.close()
+    }
+
+
 }

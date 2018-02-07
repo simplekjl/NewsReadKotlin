@@ -2,6 +2,7 @@ package com.dev.newsread.articles
 
 import com.dev.newsread.data.Article
 import com.dev.newsread.data.Source
+import rx.Observable
 import java.io.Closeable
 
 /**
@@ -10,12 +11,12 @@ import java.io.Closeable
 
 interface ArticlesUseCase : Closeable {
     fun hasArticles(): Boolean
+    fun markArticlesRead(vararg url: String)
+    fun markArticlesUnread(vararg url: String)
     fun getUnreadCount(categories: Collection<String>): Map<String, Long>
 
-    suspend fun getArticlesAsync(category: String?): List<Article>
-    suspend fun getSourcesAsync(category: String?, selectedCategories: Collection<String>): List<Source>
-    suspend fun onCategoriesChangedAsync(deletedCategories: Collection<String>)
-    suspend fun deleteOldArticlesAsync(daysToDelete: Int)
-    suspend fun markArticleReadReadAsync(vararg url: String)
-    suspend fun markArticlesUnreadAsync(vararg url: String)
+    fun getArticles(category: String?): Observable<out List<Article>>
+    fun getSources(category: String?, selectedCategories: Collection<String>): Observable<out List<Source>>
+    fun onSelectedCategoriesChanged(deletedCategories: Collection<String>): Observable<Unit>
+    fun deleteOldArticles(daysToDelete: Int): Observable<Unit>
 }

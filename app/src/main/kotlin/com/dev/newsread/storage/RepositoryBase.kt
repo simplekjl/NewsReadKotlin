@@ -24,15 +24,28 @@ abstract class RepositoryBase<T> : Repository<T> where T : RealmModel {
                 .findFirst()
     }
 
-    override fun delete(filter: RealmQuery<T>.() -> Unit): Observable<Unit> {
+    override fun getAll(): Observable<out List<T>> {
+        return realm.where(clazz)
+                .findAllAsync()
+                .asObservable()
+                .filter { r -> r.isLoaded }
+                .first()
+
+    }
+
+    override fun delete(query: RealmQuery<T>.() -> Unit): Observable<Unit> {
         return realm.transactionAsObservable {
             val results = where(clazz)
-            filter(results)
+            query(results)
             results.findAll().deleteAllFromRealm()
         }
     }
 
-    override fun deleteAll(): Observable<Unit> = realm.transactionAsObservable { delete(clazz) }
+    override fun deleteAll(): Observable<Unit> {
+        return realm.transactionAsObservable {
+            delete(clazz)
+        }
+    }
 
     override fun update(id: String, modifier: T.() -> Unit) {
         realm.executeTransaction { r ->
@@ -43,16 +56,17 @@ abstract class RepositoryBase<T> : Repository<T> where T : RealmModel {
         }
     }
 
-
-
     override fun add(item: T) {
-        return realm.executeTransaction { r ->
+        realm.executeTransactionAsync { r ->
             r.copyToRealm(item)
         }
     }
 
-    override fun addAll(items: List<T>): Observable<Unit> =
-            realm.transactionAsObservable { copyToRealmOrUpdate(items) }
+    override fun addAll(items: List<T>): Observable<Unit> {
+        return realm.transactionAsObservable {
+            copyToRealmOrUpdate(items)
+        }
+    }
 
     override fun count(filter: RealmQuery<T>.() -> Unit): Long {
         val results = realm.where(clazz)
@@ -62,29 +76,20 @@ abstract class RepositoryBase<T> : Repository<T> where T : RealmModel {
 
     override fun count(): Long = realm.where(clazz).count()
 
-    override fun query(filter: RealmQuery<T>.() -> Unit, sortFields: Array<String>?, orders: Array<Sort>?): Observable<out List<T>> {
+    override fun query(init: RealmQuery<T>.() -> Unit, sortField: Array<String>?, order: Array<Sort>?): Observable<out List<T>> {
         val results = realm.where(clazz)
-        filter(results)
-        return if (sortFields == null) {
-            results.findAllAsync().asObservable()
+        init(results)
+        return if (sortField == null) {
+            results.findAllAsync()
                     .asObservable()
                     .filter { r -> r.isLoaded }
                     .first()
         } else {
-            results.findAllSortedAsync(sortFields, orders)
+            results.findAllSortedAsync(sortField, order)
                     .asObservable()
                     .filter { r -> r.isLoaded }
                     .first()
-
         }
-    }
-
-    override fun getAll(): Observable<out List<T>> {
-        return realm.where(clazz)
-                .findAllAsync()
-                .asObservable()
-                .filter { r -> r.isLoaded }
-                .first()
     }
 
     override fun close() {

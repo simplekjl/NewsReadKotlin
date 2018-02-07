@@ -5,6 +5,7 @@ import com.dev.newsread.data.Article
 import com.dev.newsread.data.Source
 import com.dev.newsread.storage.Repository
 import io.realm.Sort
+import rx.Observable
 import java.util.*
 
 /**
@@ -20,34 +21,36 @@ class ArticlesUseCaseImpl(private val articlesRepository: Repository<Article>,
 
     override fun hasArticles(): Boolean = articlesRepository.count() > 0L
 
-    suspend override fun deleteOldArticlesAsync(daysToDelete: Int) {
+    override fun deleteOldArticles(daysToDelete: Int): Observable<Unit> {
         val deleteThreshold = Date().time - daysToDelete * MILLIS_IN_DAY
-        articlesRepository.delete {
+        return articlesRepository.delete {
             lessThan("publishedAt", deleteThreshold)
         }
     }
 
-    suspend override fun onCategoriesChangedAsync(deletedCategories: Collection<String>) {
-        if (deletedCategories.isNotEmpty()) {
-            articlesRepository.delete {
-                `in`("category", deletedCategories.toTypedArray())
+    override fun onSelectedCategoriesChanged(deletedCategories: Collection<String>): Observable<Unit> {
+        return articlesRepository.delete {
+            `in`("category", deletedCategories.toTypedArray())
+        }
+    }
+
+    override fun markArticlesRead(vararg url: String) {
+        url.forEach {
+            articlesRepository.update(it) {
+                isUnread = false
             }
         }
     }
 
-    override suspend fun markArticleReadReadAsync(vararg url: String) {
-        articlesRepository.updateAsync(*url) {
-            isUnread = false
+    override fun markArticlesUnread(vararg url: String) {
+        url.forEach { u ->
+            articlesRepository.update(u) {
+                isUnread = true
+            }
         }
     }
 
-    suspend override fun markArticlesUnreadAsync(vararg url: String) {
-        articlesRepository.updateAsync(*url) {
-            isUnread = true
-        }
-    }
-
-    suspend override fun getArticlesAsync(category: String?): List<Article> {
+    override fun getArticles(category: String?): Observable<out List<Article>> {
         return articlesRepository.query({
             if (category != null) {
                 equalTo("category", category)
@@ -57,7 +60,7 @@ class ArticlesUseCaseImpl(private val articlesRepository: Repository<Article>,
         }, arrayOf("isUnread", "publishedAt"), arrayOf(Sort.DESCENDING, Sort.DESCENDING))
     }
 
-    suspend override fun getSourcesAsync(category: String?, selectedCategories: Collection<String>): List<Source> {
+    override fun getSources(category: String?, selectedCategories: Collection<String>): Observable<out List<Source>> {
         return sourcesRepository.query({
             if (category != null) {
                 equalTo("category", category)

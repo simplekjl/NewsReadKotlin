@@ -13,15 +13,13 @@ import com.dev.newsread.extensions.startActivity
 import com.dev.newsread.injection.Injector
 import kotlinx.android.synthetic.main.app_bar_main.toolbar
 import kotlinx.android.synthetic.main.layout_categories.*
-import kotlinx.coroutines.experimental.Job
-import kotlinx.coroutines.experimental.android.UI
-import kotlinx.coroutines.experimental.launch
+import rx.android.schedulers.AndroidSchedulers
 import javax.inject.Inject
 
 /**
  * Created by jlcs on 1/25/18.
  */
-class StartupActivity : BaseCategoriesActivity(), StartupView {
+class StartupActivity :  BaseCategoriesActivity(), StartupView {
 
     @Inject
     override lateinit var presenter: StartupPresenter
@@ -29,7 +27,7 @@ class StartupActivity : BaseCategoriesActivity(), StartupView {
     override val categoriesViewGroup: ViewGroup
         get() = categoriesHost
 
-    private var job: Job? = null
+    private var dialog: ProgressDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,9 +37,6 @@ class StartupActivity : BaseCategoriesActivity(), StartupView {
         if (!presenter.canOpenMainView) {
             setContentView(R.layout.activity_startup)
             toolbar.title = getString(R.string.app_name)
-            var name : String = "0"
-            name.length
-
             fillCategories()
 
             var foundFirst = false
@@ -54,20 +49,18 @@ class StartupActivity : BaseCategoriesActivity(), StartupView {
             }
 
             downloadBtn.setOnClickListener {
-                job = launch(UI) {
-                    val dialog = showProgressDialog()
-                    try {
-                        presenter.downloadSourcesAsync()
-                        dialog.dismiss()
-                        startMainView()
-                    } catch (fail: Throwable) {
-                        Log.e("Sync", fail.message, fail)
-                        dialog.dismiss()
-                        showToast(getString(R.string.error_download_sources))
-                    }
-                }
+                val dialog = showProgressDialog()
+                presenter.downloadSources()
+                        .subscribeOn(AndroidSchedulers.mainThread())
+                        .subscribe({},{fail ->
+                            Log.e("Sync",fail.message,fail)
+                            dialog.dismiss()
+                        },{
+                            dialog.dismiss()
+                            startMainView()
+                        })
             }
-            presenter.onStartCategorySelect()
+            presenter.onStart()
         } else {
             startMainView()
         }
@@ -75,12 +68,20 @@ class StartupActivity : BaseCategoriesActivity(), StartupView {
 
     private fun showProgressDialog() = ProgressDialog.show(this, getString(R.string.downloading_sources), "", true, false)
 
-    private fun startMainView() {
+    override fun startMainView() {
+        dialog?.dismiss()
         startActivity<ArticlesActivity>()
+    }
+
+    override fun onError(fail: Throwable) {
+        Log.e("Sync", fail.message, fail)
+        dialog?.dismiss()
+        showToast(getString(R.string.error_download_sources))
     }
 
     override fun onDestroy() {
         super.onDestroy()
-        job?.cancel()
+        presenter.close()
     }
+
 }

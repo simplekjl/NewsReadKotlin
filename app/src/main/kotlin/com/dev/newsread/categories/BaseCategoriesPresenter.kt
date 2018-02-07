@@ -33,4 +33,9 @@ abstract class BaseCategoriesPresenter(private val sharedPreferences: SharedPref
 		categorySet?.let { c -> view.onCategorySelected(c) }
 	}
 
+	fun onStart() {
+		val categorySet = sharedPreferences.getStringSet(KEY_CATEGORIES, null)
+		categorySet?.let { c -> view.onCategorySelected(c) }
+	}
+
 }

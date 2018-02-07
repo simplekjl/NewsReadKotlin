@@ -13,9 +13,10 @@ import com.dev.newsread.storage.SourcesRepository
 import com.dev.newsread.sync.SyncUseCase
 import com.dev.newsread.sync.SyncUseCaseImpl
 import com.dev.newsread.util.SHARED_PREFS
+import com.dev.newsread.util.SchedulerProvider
+import com.dev.newsread.util.SchedulerProviderImpl
 import dagger.Module
 import dagger.Provides
-import javax.inject.Provider
 
 
 @Module
@@ -35,13 +36,20 @@ class AppModule(private val context: Context) {
 
 	@Provides
 	fun providesSyncUseCase(newsApi: NewsApi,
-							sourcesRepository: Provider<Repository<Source>>,
-							articlesRepository: Provider<Repository<Article>>): SyncUseCase = SyncUseCaseImpl(newsApi,
+							sourcesRepository: Repository<Source>,
+							articlesRepository: Repository<Article>,
+							schedulerProvider: SchedulerProvider): SyncUseCase = SyncUseCaseImpl(newsApi,
 			sourcesRepository,
-			articlesRepository)
+			articlesRepository,
+			schedulerProvider)
 
 	@Provides
 	fun providesArticlesUseCase(articlesRepository: Repository<Article>,
 								sourcesRepository: Repository<Source>) : ArticlesUseCase =
 			ArticlesUseCaseImpl(articlesRepository, sourcesRepository)
+
+    @Provides
+    fun providesSchedulerProvider(): SchedulerProvider{
+        return SchedulerProviderImpl()
+    }
 }

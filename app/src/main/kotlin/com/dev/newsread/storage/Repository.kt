@@ -19,19 +19,20 @@ interface Repository<T> : Closeable where T : RealmModel {
 
     fun deleteAll(): Observable<Unit>
 
-    fun delete(filter: RealmQuery<T>.() -> Unit) : Observable<Unit>
+    fun delete(query: RealmQuery<T>.() -> Unit): Observable<Unit>
 
-    fun update(id: String, modifier: T.() -> Unit)
+    fun update(id:String, modifier: T.() -> Unit)
 
     fun add(item: T)
 
-    fun addAll(items: List<T>) : Observable<Unit>
+    fun addAll(items: List<T>): Observable<Unit>
 
     fun count(filter: RealmQuery<T>.() -> Unit): Long
 
     fun count(): Long
 
-    fun query(filter: RealmQuery<T>.() -> Unit, sortFields: Array<String>?, orders: Array<Sort>?) : Observable<out List<T>>
+    fun query(init: RealmQuery<T>.() -> Unit, sortField: Array<String>?, order: Array<Sort>?): Observable<out List<T>>
 
     val clazz: Class<T>
+
 }

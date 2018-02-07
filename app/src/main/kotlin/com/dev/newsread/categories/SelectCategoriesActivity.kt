@@ -7,7 +7,7 @@ import android.view.View
 import android.view.ViewGroup
 import com.dev.newsread.R
 import com.dev.newsread.injection.Injector
-import kotlinx.android.synthetic.main.app_bar_main.*
+import kotlinx.android.synthetic.main.layout_categories.toolbar
 import kotlinx.android.synthetic.main.layout_categories.*
 import javax.inject.Inject
 
